@@ -1,0 +1,148 @@
+import numpy as np
+import pandas as pd
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
+
+np.set_printoptions(threshold=np.inf)
+
+def knn(k):
+    iris = load_iris()
+    X = iris.data #dane liczbowe
+    Y = iris.target #etykiety liczbowe
+    Z = iris.target_names #słowne nazwy etykiet
+    
+    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.3, random_state=5)
+    
+    test_euklides = np.zeros((Y_test.shape[0], Y_train.shape[0]))
+    test_manhattan = np.zeros((Y_test.shape[0], Y_train.shape[0]))
+    test_cosinus = np.zeros((Y_test.shape[0], Y_train.shape[0]))
+    norma_test_vector = np.zeros((X_test.shape[0], X_test.shape[1]))
+    norma_train_vector = np.zeros((X_train.shape[0], X_train.shape[1]))
+    
+    for i in range(0, X_test.shape[0]):
+        norma_test = 0
+        for j in range(0, X_test.shape[1]):
+            norma_test += X_test[i][j] * X_test[i][j]
+        norma_test = np.sqrt(norma_test)
+        for l in range(0, X_test.shape[1]):
+            norma_test_vector[i][l] = X_test[i][l] / norma_test
+            
+    for i in range(0, X_train.shape[0]):
+        norma_train = 0
+        for j in range(0, X_train.shape[1]):
+            norma_train += X_train[i][j] * X_train[i][j]
+        norma_train = np.sqrt(norma_train)
+        for l in range(0, X_train.shape[1]):
+            norma_train_vector[i][l] = X_train[i][l] / norma_train
+    
+    for i in range(0, X_test.shape[0]):
+        for j in range(0, X_train.shape[0]):
+            for l in range(0, X_train.shape[1]):
+                test_euklides[i][j] += (X_test[i][l] - X_train[j][l]) * (X_test[i][l] - X_train[j][l])
+                test_manhattan[i][j] += abs(X_test[i][l] - X_train[j][l])
+                test_cosinus[i][j] += norma_test_vector[i][l] * norma_train_vector[j][l]
+    test_euklides = np.sqrt(test_euklides)
+    test_cosinus = 1 - test_cosinus
+    
+    test_euklides_min = np.sort(test_euklides, axis=1)[:, :k]
+    test_euklides_min_index = np.argsort(test_euklides, axis=1)[:, :k]
+    test_euklides_min_class = np.zeros((X_test.shape[0], k))
+    test_manhattan_min = np.sort(test_manhattan, axis=1)[:, :k]
+    test_manhattan_min_index = np.argsort(test_manhattan, axis=1)[:, :k]
+    test_manhattan_min_class = np.zeros((X_test.shape[0], k))
+    test_cosinus_min = np.sort(test_cosinus, axis=1)[:, :k]
+    test_cosinus_min_index = np.argsort(test_cosinus, axis=1)[:, :k]
+    test_cosinus_min_class = np.zeros((X_test.shape[0], k))
+    
+    for i in range(0, X_test.shape[0]):
+        for j in range(0, k):
+            test_euklides_min_class[i][j] = Y_train[test_euklides_min_index[i][j]]
+            test_manhattan_min_class[i][j] = Y_train[test_manhattan_min_index[i][j]]
+            test_cosinus_min_class[i][j] = Y_train[test_cosinus_min_index[i][j]]
+    
+    test_euklides_wazone = np.zeros((test_euklides_min_class.shape[0], test_euklides_min_class.shape[1]))
+    test_manhattan_wazone = np.zeros((test_manhattan_min_class.shape[0], test_manhattan_min_class.shape[1]))
+    test_cosinus_wazone = np.zeros((test_cosinus_min_class.shape[0], test_cosinus_min_class.shape[1]))
+    
+    test_euklides_wazone_sum = np.zeros((X_test.shape[0], k))
+    test_manhattan_wazone_sum = np.zeros((X_test.shape[0], k))
+    test_cosinus_wazone_sum = np.zeros((X_test.shape[0], k))
+    
+    for i in range(0, X_test.shape[0]):
+        for j in range(0, k):
+            test_euklides_wazone[i][j] = 1 / test_euklides_min[i][j]
+            test_manhattan_wazone[i][j] = 1 / test_manhattan_min[i][j]
+            test_cosinus_wazone[i][j] = 1 / test_cosinus_min[i][j]
+            
+    for i in range(0, X_test.shape[0]):
+        for j in range(0, k):
+            test_euklides_wazone_sum[i][test_euklides_min_class[i][j].astype('int')] += test_euklides_wazone[i][j]
+            test_manhattan_wazone_sum[i][test_manhattan_min_class[i][j].astype('int')] += test_manhattan_wazone[i][j]
+            test_cosinus_wazone_sum[i][test_cosinus_min_class[i][j].astype('int')] += test_cosinus_wazone[i][j]
+            
+    test_euklides_min_class_result = np.argmax(test_euklides_wazone_sum, axis=1)
+    test_manhattan_min_class_result = np.argmax(test_manhattan_wazone_sum, axis=1)
+    test_cosinus_min_class_result = np.argmax(test_cosinus_wazone_sum, axis=1)
+    
+    good_result = np.zeros(3)
+    bad_result = np.zeros(3)
+    
+    for i in range(0, Y_test.shape[0]):
+        if test_euklides_min_class_result[i] == Y_test[i]:
+            good_result[0] += 1
+        else:
+            bad_result[0] += 1
+        if test_manhattan_min_class_result[i] == Y_test[i]:
+            good_result[1] += 1
+        else:
+            bad_result[1] += 1
+        if test_cosinus_min_class_result[i] == Y_test[i]:
+            good_result[2] += 1
+        else:
+            bad_result[2] += 1
+            
+    dokladnosc = (good_result - bad_result) / good_result
+            
+    print("Euklides dokładność = "+str(dokladnosc[0]))
+    print("Manhattan dokładność = "+str(dokladnosc[1]))
+    print("Cosinus dokładność = "+str(dokladnosc[2]))
+    
+    print("GOOD")
+    print(good_result)
+    print("BAD")
+    print(bad_result)
+    
+#     print("Euklides")
+#     print(test_euklides)
+#     print("Manhattan")
+#     print(test_manhattan)
+#     print("Cosinus")
+#     print(test_cosinus)
+    
+#     print("Euklides")
+#     print(test_euklides.shape)
+#     print("Manhattan")
+#     print(test_manhattan.shape)
+#     print("Cosinus")
+#     print(test_cosinus.shape)
+    
+#     print("Euklides - min")
+#     print(test_euklides_min[0])
+#     print("Euklides - index")
+#     print(test_euklides_min_index[0])
+#     print("Euklidex - class")
+#    # print(test_euklides_min_class)
+#     print("Manhattan - min")
+#     print(test_manhattan_min[0])
+#     print("Manhattan - index")
+#     print(test_manhattan_min_index[0])
+#     print("Manhattan - class")
+#    # print(test_manhattan_min_class)
+#     print("Cosinus - min")
+#     print(test_cosinus_min[0])
+#     print("Cosinus - index")
+#     print(test_cosinus_min_index[0])
+#     print("Cosinus - class")
+#    # print(test_cosinus_min_class)
+    
+knn(3)
